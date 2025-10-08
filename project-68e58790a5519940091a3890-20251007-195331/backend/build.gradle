@@ -1,0 +1,115 @@
+plugins {
+    id 'org.springframework.boot' version '3.2.0'
+    id 'io.spring.dependency-management' version '1.1.4'
+    id 'java'
+    id 'jacoco'
+    id 'checkstyle'
+}
+
+group = 'com.jsf.migration'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Spring Boot Core
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    
+    // MongoDB
+    implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
+    
+    // JWT for authentication
+    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+    
+    // Lombok to reduce boilerplate
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    
+    // Utilities
+    implementation 'org.apache.commons:commons-lang3:3.12.0'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+    
+    // Monitoring and metrics
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+    
+    // Documentation
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.2.0'
+    
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'de.flapdoodle.embed:de.flapdoodle.embed.mongo.spring30x:4.9.3'
+    testImplementation 'org.mockito:mockito-core'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+    
+    // Migration tools - specific to JSF migration
+    implementation 'org.jsoup:jsoup:1.16.1' // For HTML/XML parsing
+    implementation 'com.github.javaparser:javaparser-core:3.25.5' // For Java code parsing
+    
+    // Development tools
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+}
+
+test {
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                    "com/jsf/migration/config/**",
+                    "com/jsf/migration/dto/**",
+                    "com/jsf/migration/model/**",
+                    "com/jsf/migration/JsfMigrationApplication.class"
+            ])
+        }))
+    }
+}
+
+checkstyle {
+    toolVersion = '10.12.3'
+    configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
+}
+
+tasks.named('bootBuildImage') {
+    builder = 'paketobuildpacks/builder-jammy-base:latest'
+}
+
+// Task for cleaning build directory
+task cleanBuild(type: Delete) {
+    delete "${buildDir}"
+}
+
+// Task for generating migration reports
+task generateMigrationReport(type: JavaExec) {
+    description = 'Generates a report of JSF components that need migration'
+    group = 'Migration'
+    mainClass = 'com.jsf.migration.tools.MigrationReportGenerator'
+    classpath = sourceSets.main.runtimeClasspath
+}
